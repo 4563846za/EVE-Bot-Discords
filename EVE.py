@@ -4,14 +4,12 @@ from discord.ext import commands
 import json
 import asyncio
 import yt_dlp
-#from myserver import server_on
+from myserver import server_on
 
 import urllib.parse, urllib.request, re
 from gtts import gTTS, lang
 from discord.utils import get
 from discord import FFmpegPCMAudio, Member, user
-
-TOKEN = os.getenv("TOKEN")
 
 bot = commands.Bot(command_prefix='!',intents=discord.Intents.all())
 
@@ -363,46 +361,152 @@ async def roll(ctx, dice: str):
 
 # //////////////////////////////////////////////////////////////////////////////////////////  Music Command  ////////////////////////////////////////////////////////////////////////////////////////// #
 
-FFMPEG_OPTIONS = {'options': '-vn'}
-YDL_OPTIONS = {'format': 'bestaudio', 'noplaylist': True}
-class MusicBot(commands.Cog):
-    def __init__(self, bot):
-        self.bot = bot
-        self.queue = []
-        
-    @commands.command()
-    async def play(self, ctx, *, search):
-        voice_channel = ctx.author.voice.channel if ctx.author.voice else None
-        if not voice_channel:
-            return await ctx.send("You're not in a voice channel!")
-        if not ctx.voice_client:
-            await voice_channel.connect()
-        async with ctx.typing():
-            with yt_dlp.YoutubeDL(YDL_OPTIONS) as ydl:
-                info = ydl.extract_info(f"ytsearch:{search}", download=False)
-                if 'entries' in info:
-                    info = info['entries'][0]
-                url = info['url']
-                title = info['title']
-                self.queue.append((url, title))
-                await ctx.send(f'Added to queue: **{title}**')
-        if not ctx.voice_client.is_playing():
-            await self.play_next(ctx)
-            
-    async def play_next(self, ctx):
-        if self.queue:
-            url, title = self.queue.pop(0)
-            source = await discord.FFmpegOpusAudio.from_probe(url, **FFMPEG_OPTIONS)
-            ctx.voice_client.play(source, after=lambda _: self.client.loop.create_task(self.play_next(ctx)))
-            await ctx.send(f'Now playing: **{title}**')
-        elif not ctx.voice_client.is_playing():
-            await ctx.send("Queue is empty!")
-            
-    @commands.command()
-    async def skip(self, ctx):
-        if ctx.voice_client and ctx.voice_client.is_playing():
-            ctx.voice_client.stop()
-            await ctx.send("Skipped ⏭")
+@bot.event
+async def play_next(ctx):
+    if queues[ctx.guild.id] != []:
+        url = queues[ctx.guild.id].pop(0)
+        await play(ctx, url=url)
+
+
+def format_duration(duration_seconds):
+    minutes, seconds = divmod(duration_seconds, 60)
+    hours, minutes = divmod(minutes, 60)
+    if hours > 0:
+        return f"{hours}:{minutes:02d}:{seconds:02d}"
+    else:
+        return f"{minutes}:{seconds:02d}"
+    
+    
+@bot.command(pass_context=True, aliases=['p'])
+async def play(ctx, *, url, user: Member=None):
+    try:
+        voice_client = await ctx.author.voice.channel.connect()
+        voice_clients[voice_client.guild.id] = voice_client
+    except Exception as e:
+        print(e)
+
+    try:
+
+        if youtube_base_url not in url:
+            query_string = urllib.parse.urlencode({
+                'search_query': url
+            })
+
+            content = urllib.request.urlopen(
+                youtube_results_url + query_string
+            )
+
+            search_results = re.findall(r'/watch\?v=(.{11})', content.read().decode())
+
+            url = youtube_watch_url + search_results[0]
+
+        loop = asyncio.get_event_loop()
+        data = await loop.run_in_executor(None, lambda: ytdl.extract_info(url, download=False))
+
+        song = data['url']
+        player = discord.FFmpegOpusAudio(song, **ffmpeg_options)
+
+        voice_clients[ctx.guild.id].play(player, after=lambda e: asyncio.run_coroutine_threadsafe(play_next(ctx),
+                                                                                                  bot.loop))
+
+        if user is None:
+            user = ctx.message.author
+
+        inline = False
+        ydl = yt_dlp.YoutubeDL()
+        info = ydl.extract_info(url, download=False)
+        title = info.get('title', 'Unknown Title')
+        im = info.get('thumbnail', '')
+        duration = info.get('duration', 0)
+        emmbed = discord.Embed(title=f'{title} ',description='เปิดเพลงให้แล้วน้าา'f' {user.mention}', color=0x66FFFF)
+        userData = {
+            'Duration':f'{format_duration(duration)}',
+            'Link': url,
+                    }
+        for [fieldName, fieldVal] in userData.items():
+            emmbed.set_author(name=f"เปิดเพลงแล้ว", icon_url=eve_icons)
+            emmbed.add_field(name=fieldName, value=fieldVal, inline=inline)
+        emmbed.set_thumbnail(url=user.display_avatar)
+        emmbed.set_image(url=im)
+        emmbed.set_footer(text=eve_footer, icon_url=eve_iconf)
+        await ctx.send(embed=emmbed)
+
+    except Exception as e:
+        print(e)
+
+
+
+@bot.command(pass_context=True, aliases=['cl'])
+async def clear_q(ctx):
+    if ctx.guild.id in queues:
+        queues[ctx.guild.id].clear()
+        await ctx.send("เคลียเพลงในคิวหมดแล้วน้าาา")
+    else:
+        await ctx.send("ไม่มีเพลงในคิวนะ จะให้เคลียอะไรอะ")
+
+@bot.command(pass_context=True, aliases=['pa'])
+async def pause(ctx):
+    try:
+        voice_clients[ctx.guild.id].pause()
+    except Exception as e:
+        print(e)
+
+@bot.command(pass_context=True, aliases=['re'])
+async def resume(ctx):
+    try:
+        voice_clients[ctx.guild.id].resume()
+    except Exception as e:
+        print(e)
+
+@bot.command(name="stop")
+async def stop(ctx):
+    try:
+        voice_clients[ctx.guild.id].stop()
+        await voice_clients[ctx.guild.id].disconnect()
+        del voice_clients[ctx.guild.id]
+    except Exception as e:
+        print(e)
+
+@bot.command(pass_context=True, aliases=['q'])
+async def queue(ctx, *, url, user: Member=None):
+    if ctx.guild.id not in queues:
+        queues[ctx.guild.id] = []
+    queues[ctx.guild.id].append(url)
+    if user is None:
+        user = ctx.message.author
+
+    inline = True
+    emmbed = discord.Embed(description='เพิ่มเพลงเข้าคิวให้ละ'f' {user.mention}', color=0x66FFFF)
+    userData = {
+    }
+    for [fieldName, fieldVal] in userData.items():
+        emmbed.add_field(name=fieldName, value=fieldVal, inline=inline)
+    emmbed.set_author(name=f"คิวเพลงแล้ว", icon_url=eve_icons)
+
+    emmbed.set_thumbnail(url=user.display_avatar)
+    emmbed.set_footer(text=eve_footer, icon_url=eve_iconf)
+
+    await ctx.send(embed=emmbed)
+
+
+@bot.command(pass_context=True, aliases=['s'])
+async def skip(ctx, user: Member=None):
+    voice_clients = get(bot.voice_clients, guild=ctx.guild)
+    if user is None:
+        user = ctx.message.author
+
+    inline = True
+    emmbed = discord.Embed(description='ข้ามเพลงให้แล้วน้าา'f' {user.mention}', color=0x66FFFF)
+    userData = {
+    }
+    for [fieldName, fieldVal] in userData.items():
+                emmbed.add_field(name=fieldName, value=fieldVal, inline=inline)
+    emmbed.set_author(name=f"ข้ามเพลงแล้ว", icon_url=eve_icons)
+    emmbed.set_thumbnail(url=user.display_avatar)
+    emmbed.set_footer(text=eve_footer, icon_url=eve_iconf)
+
+    await ctx.send(embed=emmbed)
+    voice_clients.stop()
 
 
 
@@ -598,10 +702,6 @@ async def stand(ctx):
     else:
         await ctx.send("เริ่มตาใหม่กด !blackjack")
 
-#server_on()
-async def main():
-    await bot.add_cog(MusicBot(bot))
-    await bot.start(TOKEN)
+server_on()
 
-
-asyncio.run(main())
+bot.run(os.getenv("TOKEN"))
