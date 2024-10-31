@@ -39,7 +39,7 @@ async def on_ready():
     eve = 1243548886207827989
     eda = 1154363890713505842
     yokai = 1241064234989780993
-    online = [bgc(eve), bgc(eda), bgc(yokai)]
+    online = [bgc(eve)]
     text = f"EVE ตื่นแล้ว"
     emmbed = discord.Embed(title=text, color=0x66FFFF)
 
@@ -78,7 +78,7 @@ async def on_member_join(member):
 
 @bot.event
 async def on_member_remove(member):
-    channel = bot.get_channel(1243545770679074838)
+    channel = bot.get_channel(1243548886207827989)
     emmbed = discord.Embed(title=f"คนเงิ่ยนไปหายไปคนนึงแล้วล่ะ คราวนี้ที่นี่ก็น่าอยู่ขึ้นอีกนิด",
                           color=0x66FFFF,
                           timestamp=discord.utils.utcnow())
