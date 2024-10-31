@@ -7,7 +7,7 @@ from dotenv import load_dotenv
 
 # โหลด environment variables จากไฟล์ .env
 load_dotenv()
-TOKEN = os.getenv('DISCORD_TOKEN')
+TOKEN = os.getenv('TOKEN_TEST')
 
 intents = discord.Intents.default()
 intents.message_content = True
