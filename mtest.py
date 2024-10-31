@@ -1,16 +1,21 @@
-#INSTALL pynacl, discord, yt_dlp using the terminal
-#you need to put your token where it says 'TOKEN HERE'
 import discord
 from discord.ext import commands
 import yt_dlp
 import asyncio
+import os
+from dotenv import load_dotenv
+
+# โหลด environment variables จากไฟล์ .env
+load_dotenv()
+TOKEN = os.getenv('DISCORD_TOKEN')
 
 intents = discord.Intents.default()
 intents.message_content = True
 intents.voice_states = True
-TOKEN = TOKEN = os.getenv('TOKEN_TEST')
+
 FFMPEG_OPTIONS = {'options': '-vn'}
 YDL_OPTIONS = {'format': 'bestaudio', 'noplaylist': True}
+
 class MusicBot(commands.Cog):
     def __init__(self, client):
         self.client = client
@@ -49,9 +54,11 @@ class MusicBot(commands.Cog):
         if ctx.voice_client and ctx.voice_client.is_playing():
             ctx.voice_client.stop()
             await ctx.send("Skipped ⏭")
+
 client = commands.Bot(command_prefix="!", intents=intents)
+
 async def main():
     await client.add_cog(MusicBot(client))
-    await client.start((TOKEN))
-    
+    await client.start(TOKEN)
+
 asyncio.run(main())
