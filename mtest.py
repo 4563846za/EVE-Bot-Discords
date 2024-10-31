@@ -52,6 +52,6 @@ class MusicBot(commands.Cog):
 client = commands.Bot(command_prefix="!", intents=intents)
 async def main():
     await client.add_cog(MusicBot(client))
-    await client.start(TOKEN_TEST)
+    await client.start(os.getenv(TOKEN_TEST))
     
-asyncio.run(os.getenv(main)))
+asyncio.run(main())
