@@ -4,6 +4,7 @@ from discord.ext import commands
 import json
 import asyncio
 import yt_dlp
+import os
 from myserver import server_on
 
 import urllib.parse, urllib.request, re
@@ -36,7 +37,7 @@ ffmpeg_options = {'before_options': '-reconnect 1 -reconnect_streamed 1 -reconne
 @bot.event
 async def on_ready():
     bgc = bot.get_channel
-    eve = 1243546807254913096
+    eve = 1243548886207827989
     eda = 1154363890713505842
     yokai = 1241064234989780993
     online = [bgc(eve), bgc(eda), bgc(yokai)]
@@ -527,32 +528,57 @@ def load_tarot_cards():
         print("File 'tarot_cards.json' is not properly formatted")
         return []
 
+import os
+
+# ใช้ path ที่เป็น relative path
+BASE_IMAGE_PATH = os.path.join(os.path.dirname(__file__), "Tarot")
+
 @bot.command(pass_context=True, aliases=['t', 'tar', 'taro'])
-async def tarot(ctx, user: Member=None):
+async def tarot(ctx, user: discord.Member=None):
     tarot_cards = load_tarot_cards()
     if tarot_cards:
         card = random.choice(tarot_cards)
+        
+        # ดึงโฟลเดอร์และชื่อไฟล์ของภาพจาก JSON และรวมกับ BASE_IMAGE_PATH
+        folder = card["folder"]
+        image = card["image"]
+        image_path = os.path.join(BASE_IMAGE_PATH, folder, image)  # ใช้ relative path 
+
         if user is None:
             user = ctx.message.author
+
         inline = False
-        embed = discord.Embed(title=card['name'], description=card['description'], color=0x00ff00)
+        embed = discord.Embed(
+            title=card['name'],
+            description=card['description'],
+            color=0x00ff00
+        )
+
         simple = {
-            '**ความหมาย**' : '',
-            'ความหมายในเชิงความรัก' : card['m1'],
-            'หน้าที่การงาน' : card['m2'],
-            'เรื่องการเงิน' : card['m3'],
+            '**ความหมาย**': '',
+            'ความหมายในเชิงความรัก': card['m1'],
+            'หน้าที่การงาน': card['m2'],
+            'เรื่องการเงิน': card['m3'],
             'เรื่องการเดินทาง': card['m4'],
             'เรื่องสุขภาพ': card['m5'],
             'ความหมายในเชิงแนะนำ': card['m6']
         }
 
-        for [fieldName, fieldVal] in simple.items():
-            embed.add_field(name=fieldName, value=fieldVal, inline=inline)
-        embed.set_image(url=card['image'])
-        embed.set_author(name=f"แม่หมอ อีฟ", icon_url=eve_icons)
+        for field_name, field_val in simple.items():
+            embed.add_field(name=field_name, value=field_val, inline=inline)
+
+        embed.set_author(name="แม่หมอ อีฟ", icon_url=eve_icons)
         embed.set_thumbnail(url=user.display_avatar)
         embed.set_footer(text=eve_footer, icon_url=eve_iconf)
-        await ctx.send(embed=embed)
+
+        # ตรวจสอบว่ารูปภาพมีอยู่จริงก่อนส่ง
+        if os.path.isfile(image_path):
+            with open(image_path, "rb") as img:
+                file = discord.File(img, filename=image)
+                embed.set_image(url=f"attachment://{image}")
+                await ctx.send(embed=embed, file=file)
+        else:
+            await ctx.send("ไม่พบรูปภาพของไพ่ที่ระบุ")
     else:
         await ctx.send("Tarot card data is not available. Please check 'tarot_cards.json'.")
 
