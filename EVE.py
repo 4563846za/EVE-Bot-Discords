@@ -4,7 +4,6 @@ from discord.ext import commands
 import json
 import asyncio
 import yt_dlp
-import os
 from myserver import server_on
 
 import urllib.parse, urllib.request, re
