@@ -4,7 +4,7 @@ from discord.ext import commands
 import json
 import asyncio
 import yt_dlp
-#from myserver import server_on
+from myserver import server_on
 
 import urllib.parse, urllib.request, re
 from gtts import gTTS, lang
@@ -599,7 +599,7 @@ async def stand(ctx):
     else:
         await ctx.send("เริ่มตาใหม่กด !blackjack")
 
-#server_on()
+server_on()
 async def main():
     await bot.add_cog(MusicBot(bot))
     await bot.start(TOKEN)
