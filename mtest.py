@@ -54,4 +54,4 @@ async def main():
     await client.add_cog(MusicBot(client))
     await client.start(TOKEN_TEST)
     
-asyncio.run(os.getenv.main())
+asyncio.run(os.getenv(main()))
